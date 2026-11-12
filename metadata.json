@@ -1,0 +1,8 @@
+{
+  "name": "Mapa Político de la República Dominicana",
+  "description": "Mapa interactivo de las regiones y provincias de la República Dominicana con Google Maps JavaScript API, datos económicos, turísticos y visualización geoespacial.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
