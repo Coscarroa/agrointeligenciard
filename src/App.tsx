@@ -12,6 +12,7 @@ import { QuotaBanner } from './components/QuotaBanner.tsx';
 import { AcademicFooter } from './components/AcademicFooter.tsx';
 import { AlertSubscriptionModal, FarmLeadData } from './components/AlertSubscriptionModal.tsx';
 import { AdminMetricsModal } from './components/AdminMetricsModal.tsx';
+import { SupportModal } from './components/SupportModal.tsx';
 import { DOMINICAN_PROVINCES, ProvinceData } from './data/dominicanProvinces.ts';
 import { PROVINCIAL_AGRICULTURE } from './data/provinciasData.ts';
 
@@ -24,9 +25,10 @@ export default function App() {
   const [mapType, setMapType] = useState<MapTypeId>('roadmap');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Modales de Conversión y Administración
+  // Modales de Conversión, Administración y Apoyo Solidario
   const [isSubscribeModalOpen, setIsSubscribeModalOpen] = useState(false);
   const [isAdminMetricsOpen, setIsAdminMetricsOpen] = useState(false);
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isAdminMode, setIsAdminMode] = useState(false);
 
   // FASE 3: Detección del parámetro '?admin=true' en la URL
@@ -72,6 +74,7 @@ export default function App() {
         onSelectCrop={setSelectedCrop}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        onOpenSupport={() => setIsSupportModalOpen(true)}
       />
 
       {/* Resultados Flotantes de la Búsqueda Rápida */}
@@ -142,6 +145,12 @@ export default function App() {
       <AdminMetricsModal
         isOpen={isAdminMetricsOpen}
         onClose={() => setIsAdminMetricsOpen(false)}
+      />
+
+      {/* MODAL DE APOYO COMUNITARIO Y DONACIÓN (GoFundMe & PayPal) */}
+      <SupportModal
+        isOpen={isSupportModalOpen}
+        onClose={() => setIsSupportModalOpen(false)}
       />
     </div>
   );

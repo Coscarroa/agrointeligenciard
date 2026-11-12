@@ -56,6 +56,12 @@ const ProvinceCropRegionalComparison = lazy(() =>
   }))
 );
 
+const ProvincePredictiveTrendCard = lazy(() =>
+  import('./ProvincePredictiveTrendCard.tsx').then((mod) => ({
+    default: mod.ProvincePredictiveTrendCard,
+  }))
+);
+
 const ProvinceRegionalChart = lazy(() =>
   import('./ProvinceRegionalChart.tsx').then((mod) => ({ default: mod.ProvinceRegionalChart }))
 );
@@ -526,10 +532,23 @@ export const ProvinceInfoPanel: React.FC<ProvinceInfoPanelProps> = ({
             weather={weatherData}
             historicalClimatology={agroData.historicalClimatology}
             provinceName={province.name}
+            provinceId={province.id}
+            predominantCrops={agroData.predominantCrops}
           />
         </Suspense>
 
-        {/* 2. COMPARACIÓN REGIONAL DE PRODUCCIÓN DE CULTIVOS CON LAZY LOADING */}
+        {/* 2. TENDENCIA PREDICTIVA DE RENDIMIENTO CON IA AGROCLIMÁTICA Y SUELO */}
+        <Suspense fallback={<ChartSkeletonLoader height="h-52" title="Calculando tendencia predictiva de rendimiento..." />}>
+          <ProvincePredictiveTrendCard
+            provinceId={province.id}
+            provinceName={province.name}
+            weather={weatherData}
+            historicalClimatology={agroData.historicalClimatology}
+            predominantCrops={agroData.predominantCrops}
+          />
+        </Suspense>
+
+        {/* 3. COMPARACIÓN REGIONAL DE PRODUCCIÓN DE CULTIVOS CON LAZY LOADING */}
         <Suspense fallback={<ChartSkeletonLoader height="h-44" title="Cargando comparativa regional de cosechas..." />}>
           <ProvinceCropRegionalComparison
             province={province}

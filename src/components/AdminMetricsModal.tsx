@@ -9,8 +9,9 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { X, Users, BarChart3, MapPin, Sprout, Download, ShieldCheck } from 'lucide-react';
+import { X, Users, BarChart3, MapPin, Sprout, Download, ShieldCheck, Globe, TrendingUp } from 'lucide-react';
 import { FarmLeadData } from './AlertSubscriptionModal.tsx';
+import { GlobalAgTechTrendsView } from './GlobalAgTechTrendsView.tsx';
 
 interface AdminMetricsModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ interface AdminMetricsModalProps {
 
 export const AdminMetricsModal: React.FC<AdminMetricsModalProps> = ({ isOpen, onClose }) => {
   const [leads, setLeads] = useState<FarmLeadData[]>([]);
+  const [activeTab, setActiveTab] = useState<'leads' | 'trends'>('leads');
 
   useEffect(() => {
     if (isOpen) {
@@ -43,7 +45,7 @@ export const AdminMetricsModal: React.FC<AdminMetricsModalProps> = ({ isOpen, on
   // Conteo por provincia
   const provinceCounts: Record<string, number> = {};
   leads.forEach((l) => {
-    provinceCounts[l.provinceName] = (provinceCounts[l.provinceName] || 0) + 1;
+    provinceCounts[l.provinceName] = (l.provinceName in provinceCounts ? provinceCounts[l.provinceName] : 0) + 1;
   });
 
   const sortedProvinces = Object.entries(provinceCounts).sort((a, b) => b[1] - a[1]);
@@ -51,7 +53,7 @@ export const AdminMetricsModal: React.FC<AdminMetricsModalProps> = ({ isOpen, on
   // Conteo por cultivo
   const cropCounts: Record<string, number> = {};
   leads.forEach((l) => {
-    cropCounts[l.crop] = (cropCounts[l.crop] || 0) + 1;
+    cropCounts[l.crop] = (l.crop in cropCounts ? cropCounts[l.crop] : 0) + 1;
   });
 
   // Exportar a CSV para presentaciones a patrocinadores
@@ -80,20 +82,20 @@ export const AdminMetricsModal: React.FC<AdminMetricsModalProps> = ({ isOpen, on
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
+      <div className={`relative w-full ${activeTab === 'trends' ? 'max-w-4xl' : 'max-w-2xl'} bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden p-5 sm:p-6 space-y-4 my-auto transition-all duration-300 max-h-[92vh] flex flex-col`}>
         {/* Cabecera */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-800 shrink-0">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-xl bg-emerald-950 border border-emerald-600/40 text-emerald-400">
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
               <h3 className="font-outfit font-bold text-lg text-white">
-                Métricas B2B · Red Agrointeligencia RD
+                Métricas B2B & Inteligencia de Mercado
               </h3>
               <p className="text-xs text-slate-400">
-                Panel privado de tracción para patrocinadores y casas comerciales
+                Panel privado de tracción, demanda de cultivos y proyecciones AgTech
               </p>
             </div>
           </div>
@@ -104,6 +106,43 @@ export const AdminMetricsModal: React.FC<AdminMetricsModalProps> = ({ isOpen, on
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Selector de Pestañas: Leads vs Tendencias AgTech Globales */}
+        <div className="flex items-center gap-2 bg-slate-950/80 p-1 rounded-xl border border-slate-800 shrink-0">
+          <button
+            onClick={() => setActiveTab('leads')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all ${
+              activeTab === 'leads'
+                ? 'bg-emerald-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Productores & Leads ({totalLeads})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('trends')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all ${
+              activeTab === 'trends'
+                ? 'bg-sky-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>Tendencias AgTech Globales</span>
+            <span className="text-[9px] px-1.5 py-0.2 rounded bg-sky-950 text-sky-200 border border-sky-400/40 font-mono">
+              2025-2030
+            </span>
+          </button>
+        </div>
+
+        {/* Cuerpo con Scroll si es necesario */}
+        <div className="overflow-y-auto space-y-4 pr-1">
+          {activeTab === 'trends' ? (
+            <GlobalAgTechTrendsView leads={leads} />
+          ) : (
+            <>
 
         {/* Tarjetas de Métricas Resumen */}
         <div className="grid grid-cols-3 gap-3">
@@ -188,6 +227,9 @@ export const AdminMetricsModal: React.FC<AdminMetricsModalProps> = ({ isOpen, on
             <Download className="w-3.5 h-3.5" />
             <span>Descargar CSV para Patrocinadores</span>
           </button>
+        </div>
+            </>
+          )}
         </div>
       </div>
     </div>

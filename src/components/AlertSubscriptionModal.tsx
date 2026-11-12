@@ -97,21 +97,56 @@ export const AlertSubscriptionModal: React.FC<AlertSubscriptionModalProps> = ({
   };
 
   /**
-   * Función para conectar a Webhook externo (Google Sheets, Make, n8n, Supabase)
+   * Conexión al Webhook de Google Apps Script para guardar suscripciones en Google Sheets
+   * URL de despliegue Web App de Google Apps Script:
+   * https://script.google.com/macros/s/AKfycbxCtiZc7hpP11Hal_UHBipyv9Q_5FGNcRwc9jh13STIQZYn7AgwXGV2CNfePY13Dlvb/exec
    */
+  const GOOGLE_APPS_SCRIPT_WEBHOOK_URL =
+    'https://script.google.com/macros/s/AKfycbxCtiZc7hpP11Hal_UHBipyv9Q_5FGNcRwc9jh13STIQZYn7AgwXGV2CNfePY13Dlvb/exec';
+
   const sendToWebhook = async (leadData: FarmLeadData) => {
-    /*
-     * PREPARACIÓN PARA WEBHOOK EN PRODUCCIÓN:
-     * Para activar el envío automático a Google Sheets o CRM:
-     *
-     * const WEBHOOK_URL = 'https://hook.us1.make.com/tu-webhook-secreto';
-     * await fetch(WEBHOOK_URL, {
-     *   method: 'POST',
-     *   headers: { 'Content-Type': 'application/json' },
-     *   body: JSON.stringify(leadData),
-     * });
-     */
-    console.log('[Agrointeligencia RD] Lead capturado listo para Webhook:', leadData);
+    // Preparar carga de datos estructurada con nombres claros y contacto unificado
+    const contactInfo =
+      leadData.channel === 'whatsapp'
+        ? leadData.phone
+        : leadData.channel === 'email'
+        ? leadData.email
+        : `WhatsApp: ${leadData.phone} | Email: ${leadData.email}`;
+
+    const payload = {
+      nombre: leadData.producerName,
+      canal: leadData.channel,
+      contacto: contactInfo,
+      telefono: leadData.phone,
+      email: leadData.email,
+      provincia: leadData.provinceName,
+      provinciaId: leadData.provinceId,
+      cultivo: leadData.crop,
+      tareas: leadData.farmSizeTareas,
+      fecha: leadData.createdAt,
+      // Metadatos de procedencia
+      origen: 'Agrointeligencia RD Web App',
+      id: leadData.id,
+    };
+
+    try {
+      // IMPORTANTE PARA GOOGLE APPS SCRIPT:
+      // Usar mode: 'no-cors' y Content-Type: 'text/plain;charset=utf-8' con JSON.stringify(payload)
+      // para evitar bloqueos por políticas CORS en el navegador al invocar el script de Google.
+      await fetch(GOOGLE_APPS_SCRIPT_WEBHOOK_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      console.log('[Agrointeligencia RD] Suscripción enviada exitosamente a Google Apps Script:', payload);
+    } catch (webhookErr) {
+      // no-cors maneja la petición como opaca; si ocurre un fallo de red grave se registra pero no bloquea al usuario
+      console.warn('[Agrointeligencia RD] Notificación Webhook enviada con estado opaco:', webhookErr);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -152,22 +187,22 @@ export const AlertSubscriptionModal: React.FC<AlertSubscriptionModalProps> = ({
     };
 
     try {
-      // 1. Guardar en localStorage bajo la clave 'agromap_leads_rd'
+      // 1. Guardar en localStorage bajo la clave 'agromap_leads_rd' como respaldo instantáneo
       const existingRaw = localStorage.getItem('agromap_leads_rd');
       const existingLeads: FarmLeadData[] = existingRaw ? JSON.parse(existingRaw) : [];
       existingLeads.unshift(newLead);
       localStorage.setItem('agromap_leads_rd', JSON.stringify(existingLeads));
 
-      // 2. Disparar Webhook preparado
+      // 2. Disparar el Webhook real de Google Apps Script
       await sendToWebhook(newLead);
 
       setIsSubmitting(false);
       setIsSubmitted(true);
       onLeadSuccess?.(newLead);
     } catch (err) {
-      console.error('Error al guardar lead:', err);
+      console.error('Error al registrar finca:', err);
       setIsSubmitting(false);
-      setErrorMsg('Hubo un problema al registrar la suscripción. Intenta nuevamente.');
+      setErrorMsg('Hubo un problema al procesar la solicitud. Por favor intenta de nuevo.');
     }
   };
 

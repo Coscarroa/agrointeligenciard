@@ -9,7 +9,7 @@
  */
 
 import React from 'react';
-import { Search, Sprout } from 'lucide-react';
+import { Search, Sprout, Heart } from 'lucide-react';
 
 export const CROP_FILTER_OPTIONS = [
   { id: 'all', label: 'Todos los cultivos' },
@@ -33,6 +33,7 @@ export interface HeaderProps {
   onSelectCrop: (crop: string) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  onOpenSupport?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -42,6 +43,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectCrop,
   searchQuery,
   onSearchChange,
+  onOpenSupport,
 }) => {
   return (
     <header className="absolute top-2 left-2 right-2 md:top-3 md:left-3 md:right-3 max-w-7xl mx-auto z-20 flex flex-col shadow-2xl transition-all duration-300">
@@ -157,6 +159,19 @@ export const Header: React.FC<HeaderProps> = ({
             className="w-40 sm:w-48 pl-8 pr-3 py-1 text-xs rounded-lg bg-slate-950/80 border border-slate-800 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 transition-all"
           />
         </div>
+
+        {/* d) Botón de Apoyo Comunitario y Donación */}
+        {onOpenSupport && (
+          <button
+            type="button"
+            onClick={onOpenSupport}
+            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg border border-amber-500/50 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 hover:border-amber-400 shadow-sm transition-all shrink-0 cursor-pointer group"
+            title="Apoya el sostenimiento gratuito de los servidores de Agrointeligencia RD"
+          >
+            <Heart className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20 group-hover:scale-110 transition-transform" />
+            <span>Apoyar Proyecto</span>
+          </button>
+        )}
       </div>
     </header>
   );
