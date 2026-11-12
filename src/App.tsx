@@ -13,6 +13,7 @@ import { AcademicFooter } from './components/AcademicFooter.tsx';
 import { AlertSubscriptionModal, FarmLeadData } from './components/AlertSubscriptionModal.tsx';
 import { AdminMetricsModal } from './components/AdminMetricsModal.tsx';
 import { SupportModal } from './components/SupportModal.tsx';
+import { UserGuideModal } from './components/UserGuideModal.tsx';
 import { DOMINICAN_PROVINCES, ProvinceData } from './data/dominicanProvinces.ts';
 import { PROVINCIAL_AGRICULTURE } from './data/provinciasData.ts';
 
@@ -25,10 +26,12 @@ export default function App() {
   const [mapType, setMapType] = useState<MapTypeId>('roadmap');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Modales de Conversión, Administración y Apoyo Solidario
+  // Modales de Conversión, Administración, Apoyo Solidario y Guía Interactiva
   const [isSubscribeModalOpen, setIsSubscribeModalOpen] = useState(false);
   const [isAdminMetricsOpen, setIsAdminMetricsOpen] = useState(false);
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+  const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
+  const [guideInitialStep, setGuideInitialStep] = useState(1);
   const [isAdminMode, setIsAdminMode] = useState(false);
 
   // FASE 3: Detección del parámetro '?admin=true' en la URL
@@ -38,6 +41,37 @@ export default function App() {
       setIsAdminMode(true);
     }
   }, []);
+
+  // Apertura automática en primera visita (agromap_guia_vista) tras 800ms
+  useEffect(() => {
+    try {
+      const yaVisto = localStorage.getItem('agromap_guia_vista');
+      if (!yaVisto) {
+        const timer = setTimeout(() => {
+          setIsGuideModalOpen(true);
+          setGuideInitialStep(1);
+          localStorage.setItem('agromap_guia_vista', 'true');
+        }, 800);
+        return () => clearTimeout(timer);
+      }
+    } catch (e) {
+      console.warn('LocalStorage no disponible:', e);
+    }
+  }, []);
+
+  const handleOpenGuide = () => {
+    setGuideInitialStep(1);
+    setIsGuideModalOpen(true);
+  };
+
+  const handleCloseGuide = () => {
+    try {
+      localStorage.setItem('agromap_guia_vista', 'true');
+    } catch {
+      // Ignorar errores
+    }
+    setIsGuideModalOpen(false);
+  };
 
   // Filtrado de provincias para el buscador rápido
   const searchResults = useMemo(() => {
@@ -75,6 +109,7 @@ export default function App() {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onOpenSupport={() => setIsSupportModalOpen(true)}
+        onOpenGuide={handleOpenGuide}
       />
 
       {/* Resultados Flotantes de la Búsqueda Rápida */}
@@ -151,6 +186,13 @@ export default function App() {
       <SupportModal
         isOpen={isSupportModalOpen}
         onClose={() => setIsSupportModalOpen(false)}
+      />
+
+      {/* MANUAL INTERACTIVO DE USO (5 PASOS) */}
+      <UserGuideModal
+        isOpen={isGuideModalOpen}
+        onClose={handleCloseGuide}
+        initialStep={guideInitialStep}
       />
     </div>
   );

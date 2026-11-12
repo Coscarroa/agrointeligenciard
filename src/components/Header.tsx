@@ -9,7 +9,7 @@
  */
 
 import React from 'react';
-import { Search, Sprout, Heart } from 'lucide-react';
+import { Search, Sprout, Heart, BookOpen } from 'lucide-react';
 
 export const CROP_FILTER_OPTIONS = [
   { id: 'all', label: 'Todos los cultivos' },
@@ -34,6 +34,7 @@ export interface HeaderProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onOpenSupport?: () => void;
+  onOpenGuide?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -44,6 +45,7 @@ export const Header: React.FC<HeaderProps> = ({
   searchQuery,
   onSearchChange,
   onOpenSupport,
+  onOpenGuide,
 }) => {
   return (
     <header className="absolute top-2 left-2 right-2 md:top-3 md:left-3 md:right-3 max-w-7xl mx-auto z-20 flex flex-col shadow-2xl transition-all duration-300">
@@ -170,6 +172,19 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Heart className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20 group-hover:scale-110 transition-transform" />
             <span>Apoyar Proyecto</span>
+          </button>
+        )}
+
+        {/* e) Botón Permanente de Manual Interactivo de Uso */}
+        {onOpenGuide && (
+          <button
+            type="button"
+            onClick={onOpenGuide}
+            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 shadow-sm transition-all shrink-0 cursor-pointer group"
+            title="Abrir el Manual Interactivo de Uso de Agrointeligencia RD"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-sky-400 group-hover:scale-110 transition-transform" />
+            <span>¿Cómo usar?</span>
           </button>
         )}
       </div>
