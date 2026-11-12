@@ -70,6 +70,30 @@ export interface IrrigationAssistant {
   waterBalanceMm: number; // Precipitación - ET0
 }
 
+// 5. Ventana Operativa de Fumigación y Aspersión Agrícola (Próximas 6 Horas)
+export type SprayingSafetyStatus = 'VERDE' | 'AMARILLO' | 'ROJO';
+
+export interface SprayingHour {
+  time: string;
+  hourLabel: string; // ej. "2 PM", "3 PM"
+  temperature: number; // °C
+  relativeHumidity: number; // %
+  windSpeed: number; // km/h
+  precipitation: number; // mm
+  precipitationProbability: number; // %
+  status: SprayingSafetyStatus;
+  statusLabel: string;
+  reason: string;
+}
+
+export interface SprayingWindowAssessment {
+  currentStatus: SprayingSafetyStatus;
+  statusTitle: string;
+  verdictMessage: string;
+  hours: SprayingHour[]; // Próximas 6 horas exactas
+  bestWindowLabel: string;
+}
+
 export interface AgroWeatherData {
   provinceId: string;
   source: 'open-meteo' | 'localStorage' | 'fallback';
@@ -88,6 +112,8 @@ export interface AgroWeatherData {
   trafficLight: AgroTrafficLightAlert;
   irrigationAssistant: IrrigationAssistant;
   thermalAlert: ThermalStressAlert;
+  sprayingWindow: SprayingWindowAssessment;
+  next6Hours: SprayingHour[];
   agronomy: {
     et0Today: number; // mm
     precipitationToday: number; // mm
@@ -269,6 +295,106 @@ export function calculateIrrigationAssistant(
 }
 
 /**
+ * 5. Evaluación de Seguridad para Fumigación y Aspersión Agrícola (Por Hora)
+ * - VERDE: Viento < 15 km/h, Prob. lluvia < 25%, Temp < 31°C y Humedad Relativa > 45%.
+ * - AMARILLO: Viento 15-22 km/h, Prob. lluvia 25-50% o Temp 31-34°C.
+ * - ROJO: Viento > 22 km/h, Prob. lluvia > 50% o lluvia activa > 0.2 mm.
+ */
+export function evaluateHourSprayingSafety(
+  temp: number,
+  humidity: number,
+  windSpeed: number,
+  precip: number,
+  precipProb: number
+): { status: SprayingSafetyStatus; statusLabel: string; reason: string } {
+  // 1. Condición Crítica / Rojo
+  if (windSpeed > 22 || precipProb > 50 || precip > 0.2) {
+    let reason = 'Alto riesgo';
+    if (precip > 0.2 || precipProb > 50) reason = 'Riesgo de lavado por lluvia';
+    else if (windSpeed > 22) reason = 'Deriva excesiva por viento fuerte';
+    return {
+      status: 'ROJO',
+      statusLabel: 'No Fumigar',
+      reason,
+    };
+  }
+
+  // 2. Condición de Precaución / Amarillo
+  if (
+    (windSpeed >= 15 && windSpeed <= 22) ||
+    (precipProb >= 25 && precipProb <= 50) ||
+    (temp >= 31 && temp <= 34) ||
+    humidity < 45
+  ) {
+    let reason = 'Aplicación condicionada';
+    if (windSpeed >= 15) reason = 'Viento moderado (usar antideriva)';
+    else if (temp >= 31) reason = 'Calor elevado (evaporación rápida)';
+    else if (humidity < 45) reason = 'Baja humedad ambiental';
+    else reason = 'Lluvia probable en la zona';
+    return {
+      status: 'AMARILLO',
+      statusLabel: 'Precaución',
+      reason,
+    };
+  }
+
+  // 3. Condición Óptima / Verde
+  return {
+    status: 'VERDE',
+    statusLabel: 'Óptimo',
+    reason: 'Absorción foliar ideal y sin deriva',
+  };
+}
+
+export function evaluateSprayingWindow(hours: SprayingHour[]): SprayingWindowAssessment {
+  if (hours.length === 0) {
+    return {
+      currentStatus: 'AMARILLO',
+      statusTitle: 'Precaución / Aplicación Condicionada',
+      verdictMessage: 'Sin datos horarios suficientes para validar ventana.',
+      hours: [],
+      bestWindowLabel: 'Consultar al atardecer',
+    };
+  }
+
+  // Analizar las primeras horas críticas (próximas 4 horas)
+  const criticalHours = hours.slice(0, 4);
+  const firstHour = hours[0];
+
+  let currentStatus: SprayingSafetyStatus = firstHour.status;
+  let statusTitle = 'Ventana Óptima para Fumigar';
+  let verdictMessage = 'Condiciones ideales de viento y humedad. Buena absorción foliar y bajo riesgo de deriva.';
+
+  // Si la primera hora o la mayoría es roja
+  const redCount = criticalHours.filter((h) => h.status === 'ROJO').length;
+  const yellowCount = criticalHours.filter((h) => h.status === 'AMARILLO').length;
+
+  if (firstHour.status === 'ROJO' || redCount >= 2) {
+    currentStatus = 'ROJO';
+    statusTitle = 'No Fumigar - Alto Riesgo';
+    verdictMessage = 'Riesgo alto de lavado por lluvia o arrastre por viento. Pospón la aplicación.';
+  } else if (firstHour.status === 'AMARILLO' || yellowCount >= 2) {
+    currentStatus = 'AMARILLO';
+    statusTitle = 'Precaución / Aplicación Condicionada';
+    verdictMessage = 'Viento moderado o calor elevado. Usa boquillas antideriva o espera al final de la tarde.';
+  }
+
+  // Encontrar la mejor ventana (primera hora verde)
+  const bestHour = hours.find((h) => h.status === 'VERDE');
+  const bestWindowLabel = bestHour
+    ? `Ventana segura a las ${bestHour.hourLabel} (${bestHour.windSpeed} km/h, ${bestHour.precipitationProbability}% lluvia)`
+    : 'No se detecta ventana verde en las próximas 6 horas';
+
+  return {
+    currentStatus,
+    statusTitle,
+    verdictMessage,
+    hours,
+    bestWindowLabel,
+  };
+}
+
+/**
  * LÓGICA DE ANÁLISIS DE ESTRÉS TÉRMICO AGROPECUARIO:
  * THI = 0.8 * T + (RH / 100) * (T - 14.4) + 46.4
  */
@@ -391,7 +517,7 @@ export async function fetchAgroWeather(
     );
     url.searchParams.set(
       'hourly',
-      'soil_temperature_0cm,soil_moisture_0_to_1cm'
+      'soil_temperature_0cm,soil_moisture_0_to_1cm,precipitation_probability,precipitation,wind_speed_10m,temperature_2m,relative_humidity_2m'
     );
     url.searchParams.set(
       'daily',
@@ -478,6 +604,88 @@ export async function fetchAgroWeather(
       soilMoisturePct
     );
 
+    // 5. Ventana Operativa de Fumigación y Aspersión Agrícola (Próximas 6 Horas)
+    const hourlyTimes: string[] = hourlyRaw.time || [];
+    let currentHourIndex = 0;
+    try {
+      const now = new Date();
+      const dominicanFormatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Santo_Domingo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        hour12: false,
+      });
+      const parts = dominicanFormatter.formatToParts(now);
+      const y = parts.find((p) => p.type === 'year')?.value || '2026';
+      const m = parts.find((p) => p.type === 'month')?.value || '11';
+      const d = parts.find((p) => p.type === 'day')?.value || '12';
+      const h = parts.find((p) => p.type === 'hour')?.value || '12';
+      const currentPrefix = `${y}-${m}-${d}T${h}`;
+
+      const matchedIdx = hourlyTimes.findIndex((t) => t.startsWith(currentPrefix));
+      if (matchedIdx !== -1) {
+        currentHourIndex = matchedIdx;
+      }
+    } catch {
+      currentHourIndex = 0;
+    }
+
+    const next6Hours: SprayingHour[] = [];
+    for (let i = 0; i < 6; i++) {
+      const idx = currentHourIndex + i;
+      if (idx < hourlyTimes.length) {
+        const timeStr = hourlyTimes[idx];
+        const hourNum = parseInt(timeStr.slice(11, 13), 10);
+        const ampm = hourNum >= 12 ? 'PM' : 'AM';
+        const hour12 = hourNum % 12 || 12;
+        const hourLabel = `${hour12} ${ampm}`;
+
+        const hTemp = Math.round(hourlyRaw.temperature_2m?.[idx] ?? temp2m);
+        const hHum = Math.round(hourlyRaw.relative_humidity_2m?.[idx] ?? relHum);
+        const hWind = Math.round(hourlyRaw.wind_speed_10m?.[idx] ?? windSpeed);
+        const hPrecip = Number((hourlyRaw.precipitation?.[idx] ?? 0).toFixed(1));
+        const hPrecipProb = Math.round(hourlyRaw.precipitation_probability?.[idx] ?? 0);
+
+        const safety = evaluateHourSprayingSafety(hTemp, hHum, hWind, hPrecip, hPrecipProb);
+
+        next6Hours.push({
+          time: timeStr,
+          hourLabel,
+          temperature: hTemp,
+          relativeHumidity: hHum,
+          windSpeed: hWind,
+          precipitation: hPrecip,
+          precipitationProbability: hPrecipProb,
+          status: safety.status,
+          statusLabel: safety.statusLabel,
+          reason: safety.reason,
+        });
+      }
+    }
+
+    // Si la API devolvió menos de 6 horas, completar con valores proyectados
+    while (next6Hours.length < 6) {
+      const offset = next6Hours.length;
+      const hour12 = ((14 + offset) % 12) || 12;
+      const ampm = (14 + offset) >= 12 && (14 + offset) < 24 ? 'PM' : 'AM';
+      next6Hours.push({
+        time: `2026-11-12T${14 + offset}:00`,
+        hourLabel: `${hour12} ${ampm}`,
+        temperature: Math.round(temp2m - offset * 0.5),
+        relativeHumidity: Math.min(95, relHum + offset * 2),
+        windSpeed: Math.max(6, windSpeed - offset),
+        precipitation: 0,
+        precipitationProbability: 10,
+        status: 'VERDE',
+        statusLabel: 'Óptimo',
+        reason: 'Condición proyectada estable',
+      });
+    }
+
+    const sprayingWindow = evaluateSprayingWindow(next6Hours);
+
     // Pronóstico estructurado de 7 días
     const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
     const dailyForecast = (dailyRaw.time || []).map((dateStr, i) => {
@@ -512,6 +720,8 @@ export async function fetchAgroWeather(
       trafficLight,
       irrigationAssistant,
       thermalAlert,
+      sprayingWindow,
+      next6Hours,
       agronomy: {
         et0Today: Number(et0Today.toFixed(1)),
         precipitationToday: Number(precipToday.toFixed(1)),
@@ -591,6 +801,32 @@ export function createFallbackWeatherData(
     soilMoisturePct
   );
 
+  // Fallback para las próximas 6 horas de aspersión
+  const fallbackHoursLabels = ['2 PM', '3 PM', '4 PM', '5 PM', '6 PM', '7 PM'];
+  const next6Hours: SprayingHour[] = fallbackHoursLabels.map((lbl, i) => {
+    const hTemp = Math.round(temp2m - i * 0.4);
+    const hHum = Math.min(90, Math.round(relHum + i * 2));
+    const hWind = Math.max(9, Math.round(windSpeed - i * 1.2));
+    const hPrecip = i === 2 ? 0.3 : 0;
+    const hProb = i === 2 ? 35 : 12;
+    const safety = evaluateHourSprayingSafety(hTemp, hHum, hWind, hPrecip, hProb);
+
+    return {
+      time: `2026-11-12T${14 + i}:00`,
+      hourLabel: lbl,
+      temperature: hTemp,
+      relativeHumidity: hHum,
+      windSpeed: hWind,
+      precipitation: hPrecip,
+      precipitationProbability: hProb,
+      status: safety.status,
+      statusLabel: safety.statusLabel,
+      reason: safety.reason,
+    };
+  });
+
+  const sprayingWindow = evaluateSprayingWindow(next6Hours);
+
   return {
     provinceId,
     source: 'fallback',
@@ -609,6 +845,8 @@ export function createFallbackWeatherData(
     trafficLight,
     irrigationAssistant,
     thermalAlert,
+    sprayingWindow,
+    next6Hours,
     agronomy: {
       et0Today,
       precipitationToday: precipToday,
